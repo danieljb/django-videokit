@@ -1,0 +1,2 @@
+#-e git+https://danieljb@github.com/dmurmann/videokit.git#egg=videokit
+-e git+https://github.com/danieljb/django-hybrid-filefield#egg=hybrid_filefield

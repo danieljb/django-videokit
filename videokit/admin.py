@@ -1,8 +1,23 @@
 
-from django.contrib import admin
 from django.contrib.contenttypes import generic
+from django.contrib import messages
+from django.contrib import admin
 
-from videokit.models import EncodingPreset, EncodingFilterScaling, EncodingFilterCropping
+from django.utils.translation import ugettext_lazy as _
+
+from videokit.production.models import EncodingSpecificationBase, EncodingFilterScaling, EncodingFilterCropping
+
+
+def process_encodingmodel(modeladmin, request, queryset):
+    status = []
+    for obj in queryset:
+        s = obj.process()
+        if s:
+            messages.success(request, _("Successfully processed %s") % str(obj))
+        else:
+            messages.error(request, _("Error processing %s") % str(obj))
+    
+process_encodingmodel.short_description = _("Process videos with specifications from marked instances.")
 
 
 class EncodingFilterScalingInlineAdmin(admin.StackedInline):
@@ -31,32 +46,18 @@ class EncodingFilterCroppingInlineAdmin(admin.StackedInline):
     max_count = 1
     
 
-class EncodingPresetAdmin(admin.ModelAdmin):
+class EncodingSpecificationBaseAdmin(admin.ModelAdmin):
     
     inlines = [
         EncodingFilterScalingInlineAdmin,
         EncodingFilterCroppingInlineAdmin,
     ]
     
-    list_display = ('title', 'slug',)
-    
-    fieldsets = (
-        ('Filter', {
-            'fields': (('title', 'slug',), 'output_file',)
-        }),
-        ('Meta', {
-            'classes': ('collapse',),
-            'fields': ('creation_date',),
-        })
-    )
-    
-    prepopulated_fields = {'slug': ('title',),}
+    prepopulated_fields = {'identifier': ('name',),}
     readonly_fields = ('creation_date',)
     
     def save_model(self, request, obj, form, change):
-        if not obj.slug:
-            obj.slug = slugify(obj.title)
-        super(EncodingPresetAdmin, self).save_model(request, obj, form, change)
+        if not obj.identifier:
+            obj.identifier = slugify(obj.name)
+        super(EncodingSpecificationBaseAdmin, self).save_model(request, obj, form, change)
     
-
-admin.site.register(EncodingPreset, EncodingPresetAdmin)

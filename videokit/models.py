@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 
 import os 
 
@@ -11,7 +12,11 @@ from django.conf import settings
 from hybrid_filefield.fields import FileSelectOrUpload
 
 from videokit.conf import settings as video_settings
-from videokit.options import EncodingOptions
+from videokit.meta import EncodingOptions, Specification
+
+
+import logging 
+logger = logging.getLogger(__name__)
 
 
 VIDEO_PATH          = getattr(video_settings, 'VIDEO_PATH', os.path.join(settings.MEDIA_ROOT, 'videos', 'encodings'))
@@ -26,8 +31,46 @@ class EncodingModelBase(ModelBase):
     def __new__(cls, name, bases, attrs):
         model = super(EncodingModelBase, cls).__new__(cls, name, bases, attrs)
         
-        user_options = getattr(model, 'EncodingOptions', None)
-        options = EncodingOptions(user_options)
+        options = EncodingOptions(getattr(model, 'EncodingOptions', None))
+        
+        if options.specs_module:
+            try:
+                specs_module = __import__(options.specs_module, {}, {}, [''])
+            except ImportError:
+                raise ImportError('Unable to load video config module: %s' % \
+                    options.specs_module)
+            
+            specs = []
+            
+            for spec in [spec for spec in specs_module.__dict__.values()
+                if isinstance(spec, type)
+                and issubclass(spec, Specification)
+                and spec is not Specification
+            ]:
+                specials = {
+                    'identifier': spec.identifier,
+                }
+                
+                output_filefield = FileSelectOrUpload(
+                    verbose_name=getattr(spec, 'verbose_name', '%(identifier)s file') % specials,
+                    path=getattr(spec, 'search_path', VIDEO_SEARCH_PATH) % specials,
+                    upload_to=getattr(spec, 'upload_to', VIDEO_PATH) % specials,
+                    match=getattr(spec, 'match', '') % specials,
+                    help_text=getattr(spec, 'help_text', '') % specials,
+                    null=True, blank=True,
+                )
+                
+                model.add_to_class(
+                    "%(identifier)s_file" % specials,
+                    output_filefield,
+                )
+                
+                specs.append({
+                    'identifier': spec.identifier,
+                    'output_filefield': output_filefield,
+                })
+                
+            setattr(options, 'specifications', specs)
         
         setattr(model, 'encoding_options', options)
         
@@ -44,135 +87,23 @@ class EncodingModel(models.Model):
     def save(self, *args, **kwargs):
         super(EncodingModel, self).save(*args, **kwargs)
     
-    def process(self, presets=[], force_process=False):
-        for preset in self.encoding_options.presets:
-            print "process preset %s" % preset
+    def process(self, specification=None, force_process=False):
+        if hasattr(self.encoding_options, 'specifications'):
+            for spec in self.encoding_options.specifications:
+                logger.debug("Process spec %s" % spec)
+                logger.debug("    identifier: %s" % spec.get('identifier'))
+                logger.debug("    output: %s" % spec.get('output_filefield'))
+        if hasattr(self.encoding_options, 'specs_field'):
+            for spec in getattr(self, getattr(self.encoding_options, 'specs_field')).all():
+                logger.debug("Process spec from field %s" % spec)
+                logger.debug("    identifier: %s" % spec.identifier)
+                logger.debug("    output: %s" % spec.get_path())
+        
+        return True
     
     class Meta:
         abstract = True
     
-
-class EncodingPresetBase(models.Model):
-    
-    title = models.CharField(
-        _('title'), 
-        max_length=250, 
-        null=False, 
-        blank=False, 
-    )
-    
-    slug = models.SlugField(
-        _('Preset Identifier'),
-        max_length=50,
-        null=False,
-        blank=False,
-        unique=False,
-        help_text=_('Use this slug to reference this preset in Encoding Model'),
-    )
-    
-    creation_date = models.DateTimeField(
-        auto_now_add=True,
-        editable=False,
-    )
-    
-    def __unicode__(self):
-        return u"%s" % self.title
-    
-    class Meta: 
-        abstract = True
-    
-
-class EncodingPreset(EncodingPresetBase):
-    
-    registered_filters = list()
-    
-    output_file = FileSelectOrUpload(
-        verbose_name=_('Video File'), 
-        path=VIDEO_SEARCH_PATH, 
-        upload_to=VIDEO_PATH, 
-        match=VIDEO_PATH_FILTER, 
-        null=True, blank=True, 
-        help_text=_( 
-            'Select a video file which was uploaded to %(video_search_path)s on the server or upload one via http.' % 
-                {'video_search_path': os.path.relpath(os.path.realpath(VIDEO_SEARCH_PATH), settings.MEDIA_ROOT),}
-        ),
-    )
-    
-
-class EncodingFilterBase(ModelBase):
-    
-    def __new__(cls, name, bases, attrs):
-        model = super(EncodingFilterBase, cls).__new__(cls, name, bases, attrs)
-        if bases[0] is not models.Model:
-            model.preset_class.registered_filters.append("%s_set" % name.lower())
-        
-        return model
-    
-
-class EncodingFilter(models.Model):
-    
-    __metaclass__ = EncodingFilterBase
-    
-    preset_class = EncodingPreset
-    
-    preset = models.ForeignKey(
-        EncodingPreset,
-        null=False,
-        blank=False,
-        unique=True,
-    )
-    
-    def __unicode__(self):
-        return u"%s filter" % self.preset.title
-    
-    class Meta: 
-        abstract = True
-    
-
-class EncodingFilterScaling(EncodingFilter):
-    
-    width = models.IntegerField(
-        _('width'),
-        null=True,
-        blank=True,
-        help_text=_('Width in pixels'),
-    )
-    
-    height = models.IntegerField(
-        _('height'),
-        null=True,
-        blank=True,
-        help_text=_('Height in pixels'),
-    )
-    
-
-class EncodingFilterCropping(EncodingFilter):
-
-    left = models.IntegerField(
-        _('left'),
-        null=True,
-        blank=True,
-        help_text=_('Left pixel'),
-    )
-
-    right = models.IntegerField(
-        _('right'),
-        null=True,
-        blank=True,
-        help_text=_('Right pixel'),
-    )
-    
-    top = models.IntegerField(
-        _('top'),
-        null=True,
-        blank=True,
-        help_text=_('Top pixel'),
-    )
-
-    bottom = models.IntegerField(
-        _('bottom'),
-        null=True,
-        blank=True,
-        help_text=_('Bottom pixel'),
-    )
+    class EncodingOptions:
+        pass
     

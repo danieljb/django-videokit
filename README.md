@@ -1,6 +1,8 @@
 # Django Videokit #
 
-A Django app to encode videos using videokit
+A Django app to encode videos using videokit.
+
+*Note: This app is currently not in a working state.*
 
 # Dependencies #
 

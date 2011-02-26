@@ -70,7 +70,7 @@ class EncodingFilter(models.Model):
     )
     
     def __unicode__(self):
-        return u"%s filter" % self.preset.title
+        return u"%s filter" % self.specifications.name
     
     class Meta: 
         app_label = 'videokit'

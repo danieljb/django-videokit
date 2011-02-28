@@ -13,7 +13,7 @@ from hybrid_filefield.fields import FileSelectOrUpload
 
 from videokit.conf import settings as video_settings
 from videokit.meta import EncodingOptions, Specification
-
+from videokit.tasks import ProcessVideo
 
 import logging 
 logger = logging.getLogger(__name__)
@@ -98,7 +98,8 @@ class EncodingModel(models.Model):
                 logger.debug("Process spec from field %s" % spec)
                 logger.debug("    identifier: %s" % spec.identifier)
                 logger.debug("    output: %s" % spec.get_path())
-        
+        p = ProcessVideo.delay(video_pk=self.pk)
+        logger.debug("Started process: %s" % p)
         return True
     
     class Meta:

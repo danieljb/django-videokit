@@ -11,5 +11,8 @@ class Video_x264(Specification):
     match = '.+\.jpg'
     specs_field = None
     
-    filters = {}
+    filters = {
+        'scaling': {'width': 1024, 'height': 768,},
+        'cropping': {'x': 16, 'y': 16,},
+    }
     

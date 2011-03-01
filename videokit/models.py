@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import os 
+import os
 
 from django.db.models.base import ModelBase
 from django.db import models
@@ -15,7 +15,7 @@ from videokit.conf import settings as video_settings
 from videokit.meta import EncodingOptions, Specification
 from videokit.tasks import ProcessVideo
 
-import logging 
+import logging
 logger = logging.getLogger(__name__)
 
 
@@ -68,14 +68,15 @@ class EncodingModelBase(ModelBase):
                 specs.append({
                     'identifier': spec.identifier,
                     'output_file': output_filefield,
+                    'filters': getattr(spec, 'filters', {}),
                 })
-                
+            
             setattr(options, 'specifications', specs)
         
         setattr(model, 'encoding_options', options)
         
         return model
-    
+
 
 class EncodingModel(models.Model):
     
@@ -91,7 +92,10 @@ class EncodingModel(models.Model):
                 specs.append(spec.as_dict())
         
         logger.debug("Process specs: %s" % specs)
-        p = ProcessVideo.delay(video_pk=self.pk, getattr(self, self.encoding_options.input_file))
+        p = ProcessVideo.delay(
+            self.pk, 
+            getattr(self, self.encoding_options.input_file)
+        )
         logger.debug("Started process: %s" % p)
         return True
     

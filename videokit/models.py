@@ -61,13 +61,13 @@ class EncodingModelBase(ModelBase):
                 )
                 
                 model.add_to_class(
-                    "%(identifier)s_file" % specials,
+                    getattr(spec, 'output_file', '%(identifier)s_file') % specials,
                     output_filefield,
                 )
                 
                 specs.append({
                     'identifier': spec.identifier,
-                    'output_filefield': output_filefield,
+                    'output_file': output_filefield,
                 })
                 
             setattr(options, 'specifications', specs)
@@ -81,24 +81,17 @@ class EncodingModel(models.Model):
     
     __metaclass__ = EncodingModelBase
     
-    def __init__(self, *args, **kwargs):
-        super(EncodingModel, self).__init__(*args, **kwargs)
-    
-    def save(self, *args, **kwargs):
-        super(EncodingModel, self).save(*args, **kwargs)
-    
     def process(self, specification=None, force_process=False):
+        specs = []
         if hasattr(self.encoding_options, 'specifications'):
             for spec in self.encoding_options.specifications:
-                logger.debug("Process spec %s" % spec)
-                logger.debug("    identifier: %s" % spec.get('identifier'))
-                logger.debug("    output: %s" % spec.get('output_filefield'))
+                specs.append(spec)
         if hasattr(self.encoding_options, 'specs_field'):
             for spec in getattr(self, getattr(self.encoding_options, 'specs_field')).all():
-                logger.debug("Process spec from field %s" % spec)
-                logger.debug("    identifier: %s" % spec.identifier)
-                logger.debug("    output: %s" % spec.get_path())
-        p = ProcessVideo.delay(video_pk=self.pk)
+                specs.append(spec.as_dict())
+        
+        logger.debug("Process specs: %s" % specs)
+        p = ProcessVideo.delay(video_pk=self.pk, getattr(self, self.encoding_options.input_file))
         logger.debug("Started process: %s" % p)
         return True
     

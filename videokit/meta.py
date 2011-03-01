@@ -5,7 +5,7 @@ from django.conf import settings
 class EncodingOptions(object):
     
     specs_module = []
-    input_filefield = 'input_filefield'
+    input_file = 'input_filefield'
     
     def __init__(self, opts):
         if opts:
@@ -15,3 +15,4 @@ class EncodingOptions(object):
 
 class Specification(object):
     pass
+    

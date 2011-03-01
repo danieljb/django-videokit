@@ -1,4 +1,6 @@
 
+from django.core import serializers
+
 from django.db.models.base import ModelBase
 from django.db import models
 
@@ -10,6 +12,11 @@ from videokit.conf import settings as video_settings
 
 
 class EncodingSpecificationBase(models.Model):
+    
+    def __init__(self, *args, **kwargs):
+        super(EncodingSpecificationBase, self).__init__(*args, **kwargs)
+        if hasattr(self, '__subclasses__') and not hasattr(self, 'output_file'):
+            raise AttributeError("Instance of %s has to implement output_file property." % self.__class__)
     
     registered_filters = list()
     
@@ -36,8 +43,16 @@ class EncodingSpecificationBase(models.Model):
     
     # TODO: Add Encoder-Choices
     
-    def get_path(self):
-        pass
+    def as_dict(self):
+        spec = {
+            'identifier': self.identifier,
+            'output_file': getattr(self, 'output_file'),
+            'filters': {}
+        }
+        for filter_name in self.registered_filters:
+            filter = getattr(self, filter_name).all()[0]
+            spec.get('filters')[filter.name] = serializers.serialize('python', [filter])[0]['fields']
+        return spec
     
     def __unicode__(self):
         return u"%s" % self.name
@@ -69,6 +84,11 @@ class EncodingFilter(models.Model):
         unique=True,
     )
     
+    def __init__(self, *args, **kwargs):
+        super(EncodingFilter, self).__init__(*args, **kwargs)
+        if not hasattr(self, 'name'):
+            raise AttributeError("Instance of %s has to implement name property." % self.__class__)
+    
     def __unicode__(self):
         return u"%s filter" % self.specifications.name
     
@@ -78,6 +98,8 @@ class EncodingFilter(models.Model):
     
 
 class EncodingFilterScaling(EncodingFilter):
+    
+    name = 'scaling'
     
     width = models.IntegerField(
         _('width'),
@@ -95,7 +117,9 @@ class EncodingFilterScaling(EncodingFilter):
     
 
 class EncodingFilterCropping(EncodingFilter):
-
+    
+    name = 'cropping'
+    
     left = models.IntegerField(
         _('left'),
         null=True,

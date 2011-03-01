@@ -46,7 +46,7 @@ class EncodingSpecificationBase(models.Model):
     def as_dict(self):
         spec = {
             'identifier': self.identifier,
-            'output_file': getattr(self, 'output_file'),
+            'output_file': 'output_file',
             'filters': {}
         }
         for filter_name in self.registered_filters:

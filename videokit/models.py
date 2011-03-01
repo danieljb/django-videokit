@@ -59,15 +59,16 @@ class EncodingModelBase(ModelBase):
                     help_text=getattr(spec, 'help_text', '') % specials,
                     null=True, blank=True,
                 )
-                
+
+                fieldname = getattr(spec, 'output_file', '%(identifier)s_file') % specials
                 model.add_to_class(
-                    getattr(spec, 'output_file', '%(identifier)s_file') % specials,
+                    fieldname,
                     output_filefield,
                 )
                 
                 specs.append({
                     'identifier': spec.identifier,
-                    'output_file': output_filefield,
+                    'output_file': fieldname,
                     'filters': getattr(spec, 'filters', {}),
                 })
             
@@ -90,13 +91,16 @@ class EncodingModel(models.Model):
         if hasattr(self.encoding_options, 'specs_field'):
             for spec in getattr(self, getattr(self.encoding_options, 'specs_field')).all():
                 specs.append(spec.as_dict())
-        
-        logger.debug("Process specs: %s" % specs)
-        p = ProcessVideo.delay(
-            self.pk, 
-            getattr(self, self.encoding_options.input_file)
-        )
-        logger.debug("Started process: %s" % p)
+
+        for spec in specs:
+            logger.debug("Process spec: %s" % spec)
+            p = ProcessVideo.delay(
+                self.pk, 
+                getattr(self, self.encoding_options.input_file).path,
+                getattr(self, spec['output_file']).path,
+                spec['filters'],
+            )
+            logger.debug("Started process: %s" % p)
         return True
     
     class Meta:

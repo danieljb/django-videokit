@@ -12,21 +12,21 @@ from videokit.conf import settings as video_settings
 
 
 class EncodingSpecificationBase(models.Model):
-    
+
     def __init__(self, *args, **kwargs):
         super(EncodingSpecificationBase, self).__init__(*args, **kwargs)
         if hasattr(self, '__subclasses__') and not hasattr(self, 'output_file'):
             raise AttributeError("Instance of %s has to implement output_file property." % self.__class__)
-    
+
     registered_filters = list()
-    
+
     name = models.CharField(
-        _('name'), 
-        max_length=250, 
-        null=False, 
-        blank=False, 
+        _('name'),
+        max_length=250,
+        null=False,
+        blank=False,
     )
-    
+
     identifier = models.SlugField(
         _('identifier'),
         max_length=50,
@@ -35,91 +35,89 @@ class EncodingSpecificationBase(models.Model):
         unique=True,
         help_text=_('Use this slug to reference this specification in Encoding Model'),
     )
-    
+
     creation_date = models.DateTimeField(
         auto_now_add=True,
         editable=False,
     )
-    
-    # TODO: Add Encoder-Choices
-    
+
     def as_dict(self):
         spec = {
             'identifier': self.identifier,
             'output_file': 'output_file',
-            'filters': {}
+            'filters': {},
         }
         for filter_name in self.registered_filters:
             filter = getattr(self, filter_name).all()[0]
             spec.get('filters')[filter.name] = serializers.serialize('python', [filter])[0]['fields']
         return spec
-    
+
     def __unicode__(self):
         return u"%s" % self.name
-    
+
     class Meta:
         app_label = 'videokit'
-    
+
 
 class EncodingFilterBase(ModelBase):
-    
+
     def __new__(cls, name, bases, attrs):
         model = super(EncodingFilterBase, cls).__new__(cls, name, bases, attrs)
         if bases[0] is not models.Model:
             model.specs_class.registered_filters.append("%s_set" % name.lower())
-        
+
         return model
-    
+
 
 class EncodingFilter(models.Model):
-    
+
     __metaclass__ = EncodingFilterBase
-    
+
     specs_class = EncodingSpecificationBase
-    
+
     specifications = models.ForeignKey(
         EncodingSpecificationBase,
         null=False,
         blank=False,
         unique=True,
     )
-    
+
     def __init__(self, *args, **kwargs):
         super(EncodingFilter, self).__init__(*args, **kwargs)
         if not hasattr(self, 'name'):
             raise AttributeError("Instance of %s has to implement name property." % self.__class__)
-    
+
     def __unicode__(self):
         return u"%s filter" % self.specifications.name
-    
-    class Meta: 
+
+    class Meta:
         app_label = 'videokit'
         abstract = True
-    
+
 
 class EncodingFilterScaling(EncodingFilter):
-    
+
     name = 'scaling'
-    
+
     width = models.IntegerField(
         _('width'),
         null=True,
         blank=True,
         help_text=_('Width in pixels'),
     )
-    
+
     height = models.IntegerField(
         _('height'),
         null=True,
         blank=True,
         help_text=_('Height in pixels'),
     )
-    
+
 
 class EncodingFilterCropping(EncodingFilter):
-    
+
     name = 'cropping'
-    
+
     left = models.IntegerField(
         _('left'),
         null=True,
@@ -133,7 +131,7 @@ class EncodingFilterCropping(EncodingFilter):
         blank=True,
         help_text=_('Right pixel'),
     )
-    
+
     top = models.IntegerField(
         _('top'),
         null=True,
@@ -147,4 +145,3 @@ class EncodingFilterCropping(EncodingFilter):
         blank=True,
         help_text=_('Bottom pixel'),
     )
-    

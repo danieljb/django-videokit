@@ -5,6 +5,7 @@ from django.contrib import admin
 
 from django.utils.translation import ugettext_lazy as _
 
+from videokit.models import EncodingStatus
 from videokit.production.models import EncodingSpecificationBase, EncodingFilterScaling, EncodingFilterCropping
 
 
@@ -19,6 +20,23 @@ def process_encodingmodel(modeladmin, request, queryset):
     
 process_encodingmodel.short_description = _("Process videos with specifications from marked instances.")
 
+
+class EncodingStatusInlineAdmin(generic.GenericStackedInline):
+    model = EncodingStatus
+    ct_field = 'content_type'
+    ct_fk_field = 'object_id'
+    
+    fieldsets = (
+        ('Status', {
+            'fields': ('status', ('task_id', 'specification'), 'creation_date', 'content_type', 'object_id',),
+        }),
+    )
+    
+    extra = 1
+    max_count = 1
+    
+    readonly_fields = ('status', 'task_id', 'specification', 'creation_date', 'content_type', 'object_id',)
+    
 
 class EncodingFilterScalingInlineAdmin(admin.StackedInline):
     model = EncodingFilterScaling

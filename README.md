@@ -6,7 +6,7 @@ A Django app to encode videos using [videotool][vt].
 
 # Dependencies #
 
-Django Videokit requires Videokit and Django Hybrid-FileField to work.
+Django Videokit requires [videotool][vt] and Django Hybrid-FileField to work.
 
 # Installation #
 

@@ -16,3 +16,4 @@ class Video_x264(Specification):
         'cropping': {'x': 16, 'y': 16,},
     }
     
+    extensions = ['mp4',]

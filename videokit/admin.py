@@ -28,14 +28,14 @@ class EncodingStatusInlineAdmin(generic.GenericStackedInline):
     
     fieldsets = (
         ('Status', {
-            'fields': ('status', ('task_id', 'specification'), 'creation_date', 'content_type', 'object_id',),
+            'fields': ('status', ('task_id', 'specification'), 'creation_date', 'protocoll', 'content_type', 'object_id',),
         }),
     )
     
     extra = 1
     max_count = 1
     
-    readonly_fields = ('status', 'task_id', 'specification', 'creation_date', 'content_type', 'object_id',)
+    readonly_fields = ('status', 'task_id', 'specification', 'creation_date', 'protocoll', 'content_type', 'object_id',)
     
 
 class EncodingFilterScalingInlineAdmin(admin.StackedInline):

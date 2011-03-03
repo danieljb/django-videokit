@@ -78,8 +78,8 @@ class EncodingFilter(models.Model):
     specifications = models.ForeignKey(
         EncodingSpecificationBase,
         null=False,
-        blank=False,
         unique=True,
+        blank=False,
     )
 
     def __init__(self, *args, **kwargs):

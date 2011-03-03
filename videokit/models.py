@@ -12,6 +12,8 @@ from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes import generic
 
+from django.contrib import messages
+
 from hybrid_filefield.fields import FileSelectOrUpload
 
 from videokit.conf import settings as video_settings
@@ -22,9 +24,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-VIDEO_PATH          = getattr(video_settings, 'VIDEO_PATH', os.path.join(settings.MEDIA_ROOT, 'videos', 'encodings'))
-VIDEO_SEARCH_PATH   = getattr(video_settings, 'VIDEO_SEARCH_PATH', os.path.join(VIDEO_PATH, 'ftp_uploads'))
-VIDEO_PATH_FILTER   = getattr(video_settings, 'VIDEO_PATH_FILTER', None)
+VIDEO_PATH = getattr(video_settings, 'VIDEO_PATH', os.path.join(settings.MEDIA_ROOT, 'videos', 'encodings'))
+VIDEO_SEARCH_PATH = getattr(video_settings, 'VIDEO_SEARCH_PATH', os.path.join(VIDEO_PATH, 'ftp_uploads'))
+VIDEO_PATH_FILTER = getattr(video_settings, 'VIDEO_PATH_FILTER', None)
 
 
 # Create your models here.
@@ -54,6 +56,12 @@ class EncodingStatus(models.Model):
         _('status'),
         max_length=50,
         help_text=_('Task\'s status'),
+    )
+
+    protocoll = models.TextField(
+        _('encoding protocoll'),
+        null=True, blank=True,
+        help_text=_('Further encoding information.'),
     )
 
     content_type = models.ForeignKey(
@@ -114,6 +122,7 @@ class EncodingModelBase(ModelBase):
 
                 specs.append({
                     'identifier': spec.identifier,
+                    'extensions': getattr(spec, 'extensions', ['mov',]),
                     'output_file': fieldname,
                     'filters': getattr(spec, 'filters', {}),
                 })
@@ -140,20 +149,52 @@ class EncodingModel(models.Model):
 
         for spec in specs:
             logger.debug("Process spec: %s" % spec)
-            
+
             status = EncodingStatus.objects.create(
                 specification=spec['identifier'],
                 content_object=self,
             )
             status.save()
+            
+            # TODO clean up output file name and path creation
+            try:
+                input_file = getattr(self, self.encoding_options.input_file).path
+            except ValueError:
+                raise ValueError(
+                    'input_file of {0} has no file associated with it.'.format(self)
+                )
+                logger.error(
+                    "input_file of {0} has no file associated with it.".format(self)
+                )
+
+            try:
+                output_file = getattr(self, spec['output_file']).path
+            except ValueError:
+                input_name, ext = os.path.splitext(os.path.basename(input_file))
+                output_file = os.path.join(
+                    os.path.abspath(
+                        getattr(self, spec['output_file']).field.upload_to
+                    ),
+                    '{input_name}_{spec}.{ext}'.format(
+                        input_name=input_name,
+                        spec=spec['identifier'],
+                        ext=spec['extensions'][0],
+                    )
+                )
+                
+            logger.debug('Encode video {0} to {1}'.format(input_file, output_file))
 
             task = ProcessVideo.delay(
                 self.pk,
-                getattr(self, self.encoding_options.input_file).path,
-                getattr(self, spec['output_file']).path,
+                input_file,
+                output_file,
                 status.pk,
                 filters=spec['filters'],
+                dry=True,
             )
+            
+            setattr(self, spec['output_file'], output_file)
+            self.save()
 
             status.status = task.state
             status.task_id = task.task_id

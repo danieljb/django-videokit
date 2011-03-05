@@ -2,17 +2,13 @@
 
 import os
 
+from django.conf import settings
 from django.db.models.base import ModelBase
 from django.db import models
-
-from django.utils.translation import ugettext_lazy as _
-
-from django.conf import settings
-
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes import generic
-
 from django.contrib import messages
+from django.utils.translation import ugettext_lazy as _
 
 from hybrid_filefield.fields import FileSelectOrUpload
 
@@ -148,6 +144,7 @@ class EncodingModel(models.Model):
 
     __metaclass__ = EncodingModelBase
 
+    # TODO Decide what a return value for this method could be useful!
     def process(self, specification=None, force_process=False):
         specs = []
         if hasattr(self.encoding_options, 'specifications'):
@@ -158,52 +155,69 @@ class EncodingModel(models.Model):
                                               'specs_field')).all():
                 specs.append(spec.as_dict())
 
+        try:
+            input_file = getattr(self,
+                                 self.encoding_options.input_file).path
+        except ValueError:
+            raise ValueError('input_file of {0} has no file'
+                             ' associated with it.'.format(self))
+
         for spec in specs:
             logger.debug("Process spec: %s" % spec)
+
+            # TODO Protocoll and logging are pretty verbose right now ...
 
             status = EncodingStatus.objects.create(
                 specification=spec['identifier'],
                 content_object=self,
             )
+            protocoll = getattr(status, 'protocoll', '')
+
+            # Omit encoding if output file is already specified
+            if getattr(self, spec['output_file']):
+                info = ('Omitting further processing of {identifier}'
+                        ' on {model}, output_file already available.'.format(
+                            identifier=spec['identifier'],
+                            model=self,))
+
+                logger.info(info)
+                protocoll = '{protocoll}\n\r{info}'.format(protocoll=protocoll,
+                                                           info=info)
+                status.protocoll = protocoll
+
+                status.save()
+                continue
+
+            # Extracts file name from input_field and constructs
+            # output_file name regarding specs extension definition
+            # and output_file upload_to path.
+            in_name, ext = os.path.splitext(os.path.basename(input_file))
+            output_file = os.path.join(
+                os.path.abspath(getattr(
+                    self,
+                    spec['output_file']).field.upload_to),
+                '{in_name}_{spec}.{ext}'.format(
+                    in_name=in_name,
+                    spec=spec['identifier'],
+                    ext=spec['extensions'][0]))
+
+            info = 'Encode {identifier} for {model} to {output_file}'.format(
+                        identifier=spec['identifier'],
+                        model=self,
+                        output_file=output_file,)
+
+            logger.info(info)
+            protocoll = '{protocoll}\n\r{info}'.format(protocoll=protocoll,
+                                                       info=info)
+            status.protocoll = protocoll
+
             status.save()
-
-            # TODO Implement output file already set logic! We won't re-
-            # encode what's already there.
-
-            try:
-                input_file = getattr(self,
-                                     self.encoding_options.input_file).path
-            except ValueError:
-                raise ValueError('input_file of {0} has no file'
-                                 ' associated with it.'.format(self))
-
-            try:
-                output_file = getattr(self, spec['output_file']).path
-            except ValueError:
-                # Extracts file name from input_field and constructs
-                # output_file name regarding specs extension definition
-                # and output_file upload_to path.
-                in_name, ext = os.path.splitext(os.path.basename(input_file))
-                output_file = os.path.join(
-                    os.path.abspath(getattr(
-                        self,
-                        spec['output_file']).field.upload_to),
-                    '{in_name}_{spec}.{ext}'.format(
-                        in_name=input_name,
-                        spec=spec['identifier'],
-                        ext=spec['extensions'][0]))
-
-            logger.debug(
-                'Encode video {0} to {1}'.format(input_file, output_file))
-
-            task = ProcessVideo.delay(
-                self.pk,
-                input_file,
-                output_file,
-                status.pk,
-                filters=spec['filters'],
-                dry=True,
-            )
+            task = ProcessVideo.delay(self.pk,
+                                      input_file,
+                                      output_file,
+                                      status.pk,
+                                      filters=spec['filters'],
+                                      dry=True,)
 
             setattr(self, spec['output_file'], output_file)
             self.save()

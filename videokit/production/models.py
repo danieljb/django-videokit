@@ -15,8 +15,11 @@ class EncodingSpecificationBase(models.Model):
 
     def __init__(self, *args, **kwargs):
         super(EncodingSpecificationBase, self).__init__(*args, **kwargs)
-        if hasattr(self, '__subclasses__') and not hasattr(self, 'output_file'):
-            raise AttributeError("Instance of %s has to implement output_file property." % self.__class__)
+        if hasattr(self, '__subclasses__') and not hasattr(self,
+                'output_file'):
+            raise AttributeError(
+                'Instance of {0} has to implement'
+                ' output_file property.'.format(self.__class__))
 
     registered_filters = list()
 
@@ -33,7 +36,8 @@ class EncodingSpecificationBase(models.Model):
         null=False,
         blank=False,
         unique=True,
-        help_text=_('Use this slug to reference this specification in Encoding Model'),
+        help_text=_('Use this slug to reference this'
+                    ' specification in Encoding Model'),
     )
 
     creation_date = models.DateTimeField(
@@ -49,7 +53,8 @@ class EncodingSpecificationBase(models.Model):
         }
         for filter_name in self.registered_filters:
             filter = getattr(self, filter_name).all()[0]
-            spec.get('filters')[filter.name] = serializers.serialize('python', [filter])[0]['fields']
+            spec.get('filters')[filter.name] = serializers.serialize(
+                'python', [filter])[0]['fields']
         return spec
 
     def __unicode__(self):
@@ -64,7 +69,8 @@ class EncodingFilterBase(ModelBase):
     def __new__(cls, name, bases, attrs):
         model = super(EncodingFilterBase, cls).__new__(cls, name, bases, attrs)
         if bases[0] is not models.Model:
-            model.specs_class.registered_filters.append("%s_set" % name.lower())
+            model.specs_class.registered_filters.append(
+                "{0}_set".format(name.lower()))
 
         return model
 
@@ -85,7 +91,9 @@ class EncodingFilter(models.Model):
     def __init__(self, *args, **kwargs):
         super(EncodingFilter, self).__init__(*args, **kwargs)
         if not hasattr(self, 'name'):
-            raise AttributeError("Instance of %s has to implement name property." % self.__class__)
+            raise AttributeError(
+                'Instance of {0} has to implement'
+                ' name property.'.format(self.__class__))
 
     def __unicode__(self):
         return u"%s filter" % self.specifications.name

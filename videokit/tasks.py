@@ -29,11 +29,9 @@ class ProcessVideo(Task):
         option.status = status_callback
 
         if not dry:
-            videotool.encode_h264(
-                input_file,
-                output_file,
-                encode_options=option
-            )
+            videotool.encode_h264(input_file,
+                                  output_file,
+                                  encode_options=option)
 
         return True
 
@@ -56,11 +54,13 @@ class ProcessVideo(Task):
         report = "\n\rReturned {0}".format(retval)
         if protocoll:
             report = str(protocoll) + str(report)
-        
+
         self.status.protocoll = str(report)
         r = self.status.save()
 
-        self.logger.info("Success %s, report: %s, r: %s" % (task_id, report, r))
+        self.logger.info("Success {0}, report: {1}, r: {2}".format(task_id,
+                                                                   report,
+                                                                   r))
 
     def after_return(self, state, retval, task_id, args,
             kwargs, einfo=None):
@@ -68,8 +68,7 @@ class ProcessVideo(Task):
         self.status.save()
 
         self.logger.info("Finalized task {0} with status {1}".format(
-            task_id, self.status
-        ))
+            task_id, self.status))
 
 
 tasks.register(ProcessVideo)

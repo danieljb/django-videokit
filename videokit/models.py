@@ -13,7 +13,7 @@ from django.utils.translation import ugettext_lazy as _
 from hybrid_filefield.fields import FileSelectOrUpload
 
 from videokit.conf import settings as video_settings
-from videokit.meta import EncodingOptions, Specification
+from videokit.meta import EncodingOptions, Specification, SpecDescriptor
 from videokit.tasks import ProcessVideo
 
 import logging
@@ -128,6 +128,10 @@ class EncodingModelBase(ModelBase):
                     fieldname,
                     output_filefield,
                 )
+                setattr(model,
+                        '{0}'.format(spec.identifier),
+                        SpecDescriptor(spec, fieldname))
+
                 specs.append({
                     'identifier': spec.identifier,
                     'extensions': getattr(spec, 'extensions', ['mov',]),
@@ -143,6 +147,8 @@ class EncodingModelBase(ModelBase):
 class EncodingModel(models.Model):
 
     __metaclass__ = EncodingModelBase
+
+    status = generic.GenericRelation(EncodingStatus)
 
     # TODO Decide what a return value for this method could be useful!
     def process(self, specification=None, force_process=False):
@@ -212,12 +218,13 @@ class EncodingModel(models.Model):
             status.protocoll = protocoll
 
             status.save()
-            task = ProcessVideo.delay(self.pk,
-                                      input_file,
-                                      output_file,
-                                      status.pk,
-                                      filters=spec['filters'],
-                                      dry=True,)
+            # For debug purposes dry run is activated!
+            task = ProcessVideo.apply_sync(args=(self.pk,
+                                                 input_file,
+                                                 output_file,
+                                                 status.pk),
+                                           kwargs={'filters': spec['filters'],
+                                                   'dry': True,})
 
             setattr(self, spec['output_file'], output_file)
             self.save()
